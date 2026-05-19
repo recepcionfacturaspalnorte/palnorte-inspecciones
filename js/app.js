@@ -227,10 +227,12 @@ async function guardarInspeccion() {
   };
 
   try {
-    await db.collection('inspecciones').add(data);
+    const docRef = await db.collection('inspecciones').add(data);
     showToast('✓ Inspección guardada — Puntaje: ' + score.toFixed(1) + '%');
     document.getElementById('save-msg').textContent = '✓ Guardado correctamente';
     setTimeout(() => document.getElementById('save-msg').textContent = '', 4000);
+    // Envío automático si hay correo registrado para el área
+    envioAutomaticoCorreo(data, docRef.id);
     limpiarFormulario();
   } catch(e) {
     console.error(e);
@@ -419,6 +421,7 @@ function renderHistorial() {
           <span class="insp-score" style="color:${scoreColor(i.score)}">${i.score.toFixed(1)}%</span>
           ${scoreBadge(i.score)}
           <button class="btn-secondary sm" onclick="verDetalle('${i.id}')"><i class="ti ti-eye"></i> Ver</button>
+          <button class="btn-secondary sm" onclick="abrirModalCorreo('${i.id}')" style="color:var(--blue-text);border-color:var(--blue-text)"><i class="ti ti-mail"></i> Enviar</button>
           <button class="btn-danger" onclick="eliminarInspeccion('${i.id}')"><i class="ti ti-trash"></i></button>
         </div>
       </div>
@@ -468,6 +471,7 @@ function verDetalle(id) {
     ${field('Evidencias fotográficas', i.fotos)}
     <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn-primary" onclick="generarInforme('${id}')"><i class="ti ti-file-text"></i> Generar informe formal</button>
+      <button class="btn-secondary" onclick="abrirModalCorreo('${id}'); closeModal()"><i class="ti ti-mail"></i> Enviar por correo</button>
       <button class="btn-secondary" onclick="exportarPDF('${id}')"><i class="ti ti-download"></i> Descargar resumen</button>
     </div>`;
 
@@ -659,4 +663,124 @@ function showToast(msg, duration = 3500) {
 document.addEventListener('DOMContentLoaded', () => {
   updateTopbarDate();
   setInterval(updateTopbarDate, 60000);
+  emailjs.init(EMAILJS_PUBLIC_KEY);
 });
+
+// ─── EMAIL ────────────────────────────────────────────────────
+let emailInspeccionId = null;
+
+function abrirModalCorreo(id) {
+  const i = inspecciones.find(x => x.id === id);
+  if (!i) return;
+  emailInspeccionId = id;
+  document.getElementById('email-modal-meta').textContent = i.area + ' — ' + formatDate(i.fecha) + ' — ' + i.score.toFixed(1) + '%';
+  // Pre-llenar si hay correo registrado
+  const correoRegistrado = CORREOS_AREAS[i.area] || '';
+  document.getElementById('email-to').value = correoRegistrado;
+  document.getElementById('email-cc').value = '';
+  document.getElementById('email-msg').value = '';
+  document.getElementById('email-send-msg').textContent = '';
+  document.getElementById('email-modal-overlay').classList.remove('hidden');
+}
+
+function closeEmailModal() {
+  document.getElementById('email-modal-overlay').classList.add('hidden');
+  emailInspeccionId = null;
+}
+
+async function confirmarEnvioCorreo() {
+  const to = document.getElementById('email-to').value.trim();
+  if (!to) { document.getElementById('email-send-msg').innerHTML = '<span style="color:var(--red)">Ingresa el correo del encargado</span>'; return; }
+
+  const i = inspecciones.find(x => x.id === emailInspeccionId);
+  if (!i) return;
+
+  const btn = document.getElementById('btn-send-email');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader ti-spin"></i> Enviando...';
+
+  const catS = i.catScores || calcCatScores(i.answers || {});
+  const catLineas = CATEGORIAS.map((cat, ci) => {
+    const s = catS[ci];
+    return `• ${cat.name}: ${s !== null ? s.toFixed(0)+'%' : 'N/A'}`;
+  }).join('\n');
+
+  const msgExtra = document.getElementById('email-msg').value.trim();
+  const cc = document.getElementById('email-cc').value.trim();
+
+  const params = {
+    to_email:    to,
+    cc_email:    cc || to,
+    area:        i.area,
+    responsable: i.responsable,
+    fecha:       formatDate(i.fecha),
+    inspector:   i.inspector,
+    score:       i.score.toFixed(1),
+    nivel:       scoreLabel(i.score),
+    categorias:  catLineas,
+    obs:         i.obs         || 'Sin observaciones registradas.',
+    hallazgos:   i.hallazgos   || 'Sin hallazgos registrados.',
+    mejoras:     i.mejoras     || 'Sin oportunidades de mejora registradas.',
+    plan:        i.plan        || 'Sin plan de acción registrado.',
+    mensaje_extra: msgExtra    || ''
+  };
+
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
+    document.getElementById('email-send-msg').innerHTML = '<span style="color:var(--green)">✓ Informe enviado correctamente a ' + to + '</span>';
+    // Guardar en Firestore que se envió correo
+    await db.collection('inspecciones').doc(emailInspeccionId).update({
+      correoEnviado: true,
+      correoEnviadoA: to,
+      correoEnviadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('✓ Informe enviado a ' + to);
+    setTimeout(() => closeEmailModal(), 2500);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('email-send-msg').innerHTML = '<span style="color:var(--red)">Error al enviar. Verifica el correo e intenta de nuevo.</span>';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-send"></i> Enviar informe';
+  }
+}
+
+// Envío automático al guardar (si hay correo registrado para el área)
+async function envioAutomaticoCorreo(inspeccion, docId) {
+  const correo = CORREOS_AREAS[inspeccion.area];
+  if (!correo) return; // Sin correo registrado, no envía
+
+  const catS = inspeccion.catScores || [];
+  const catLineas = CATEGORIAS.map((cat, ci) => {
+    const s = catS[ci];
+    return `• ${cat.name}: ${s !== null && s !== undefined ? s.toFixed(0)+'%' : 'N/A'}`;
+  }).join('\n');
+
+  const params = {
+    to_email:      correo,
+    cc_email:      correo,
+    area:          inspeccion.area,
+    responsable:   inspeccion.responsable,
+    fecha:         formatDate(inspeccion.fecha),
+    inspector:     inspeccion.inspector,
+    score:         inspeccion.score.toFixed(1),
+    nivel:         scoreLabel(inspeccion.score),
+    categorias:    catLineas,
+    obs:           inspeccion.obs       || 'Sin observaciones.',
+    hallazgos:     inspeccion.hallazgos || 'Sin hallazgos.',
+    mejoras:       inspeccion.mejoras   || 'Sin oportunidades de mejora.',
+    plan:          inspeccion.plan      || 'Sin plan de acción.',
+    mensaje_extra: ''
+  };
+
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
+    await db.collection('inspecciones').doc(docId).update({
+      correoEnviado: true, correoEnviadoA: correo,
+      correoEnviadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('✓ Informe enviado automáticamente a ' + correo);
+  } catch(e) {
+    console.error('Error envío automático:', e);
+  }
+}
