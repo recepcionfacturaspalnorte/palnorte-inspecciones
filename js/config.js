@@ -41,6 +41,43 @@ const UMBRAL_REINSPECCION = 70;
 // Días sin inspección para generar alerta
 const DIAS_ALERTA = 30;
 
+// ============================================================
+//  EMAILJS — Envío de informes por correo
+// ============================================================
+const EMAILJS_SERVICE_ID  = "service_kcjovdj";
+const EMAILJS_TEMPLATE_ID = "template_5np455p";
+const EMAILJS_PUBLIC_KEY  = "WO3XZiinDHnsXOQwK";
+
+// Correos de encargados por área
+// Agrega o actualiza los correos aquí cuando los tengas
+const CORREOS_AREAS = {
+  "Orgánicos":                    "",
+  "Laboratorio de orgánicos":     "",
+  "Casa hotel":                   "",
+  "Edificio de sostenibilidad":   "",
+  "Garita":                       "",
+  "Containers":                   "",
+  "Báscula":                      "",
+  "Operaciones":                  "",
+  "Producción":                   "",
+  "Cuarto control de motores":    "",
+  "Laboratorio de calidad":       "",
+  "TIC's":                        "",
+  "Talento humano":               "",
+  "Archivo":                      "",
+  "Calidad":                      "",
+  "Comunicaciones":               "",
+  "SST":                          "",
+  "Mantenimiento":                "",
+  "Cuarto herramientas":          "",
+  "Taller mecánico":              "",
+  "Taller eléctrico":             "",
+  "Almacén":                      "",
+  "Lagunas":                      "",
+  "Contratistas Metalcat-Ofensi": "",
+  "Oficina administrativa Cúcuta":""
+};
+
 // Inicializar Firebase
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.firestore();
