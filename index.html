@@ -320,6 +320,40 @@
   </main>
 </div>
 
+<!-- MODAL CORREO -->
+<div id="email-modal-overlay" class="modal-overlay hidden" onclick="closeEmailModal()">
+  <div class="modal-box" style="max-width:480px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Enviar informe por correo</div>
+        <div class="modal-meta" id="email-modal-meta"></div>
+      </div>
+      <button class="modal-close" onclick="closeEmailModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:1rem">
+        <label>Correo del encargado del área *</label>
+        <input type="text" id="email-to" placeholder="encargado@palnorte.com">
+      </div>
+      <div class="form-group" style="margin-bottom:1rem">
+        <label>Correo con copia (CC) — opcional</label>
+        <input type="text" id="email-cc" placeholder="gerencia@palnorte.com">
+      </div>
+      <div class="form-group" style="margin-bottom:1.25rem">
+        <label>Mensaje adicional — opcional</label>
+        <textarea id="email-msg" rows="3" placeholder="Puede agregar un mensaje adicional para el encargado..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="confirmarEnvioCorreo()" id="btn-send-email">
+          <i class="ti ti-send"></i> Enviar informe
+        </button>
+        <button class="btn-secondary" onclick="closeEmailModal()">Cancelar</button>
+      </div>
+      <div id="email-send-msg" style="margin-top:.75rem;font-size:12px;min-height:18px"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL DETALLE -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
   <div class="modal-box" onclick="event.stopPropagation()">
@@ -337,6 +371,7 @@
 <!-- TOAST -->
 <div id="toast" class="toast hidden"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
