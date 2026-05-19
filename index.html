@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inspecciones Ambientales — PALNORTE S.A.S</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon"><i class="ti ti-leaf"></i></div>
+      <div>
+        <div class="logo-name">PALNORTE</div>
+        <div class="logo-sub">Gestión Ambiental</div>
+      </div>
+    </div>
+    <h1 class="login-title">Inspecciones Ambientales</h1>
+    <p class="login-desc">Sistema de lista de chequeo y seguimiento ambiental por áreas</p>
+    <div class="form-group">
+      <label>Inspector(a)</label>
+      <select id="login-inspector">
+        <option value="">— Seleccionar —</option>
+        <option>Claudia Pabón</option>
+        <option>Neyla Durán</option>
+        <option>Administrador</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div id="login-error" class="login-error"></div>
+    <button class="btn-primary full" onclick="doLogin()">
+      <i class="ti ti-login"></i> Ingresar
+    </button>
+    <div class="login-note">Código: GAM-01-FO-15 · Versión 01 · 2026-01-05</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="app hidden">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon sm"><i class="ti ti-leaf"></i></div>
+      <div>
+        <div class="logo-name sm">PALNORTE</div>
+        <div class="logo-sub sm">Ambiental</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="dashboard" onclick="switchPage(this)">
+        <i class="ti ti-layout-dashboard"></i><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="nueva" onclick="switchPage(this)">
+        <i class="ti ti-clipboard-check"></i><span>Nueva inspección</span>
+      </button>
+      <button class="nav-item" data-page="historial" onclick="switchPage(this)">
+        <i class="ti ti-history"></i><span>Historial</span>
+      </button>
+      <button class="nav-item" data-page="alertas" onclick="switchPage(this)">
+        <i class="ti ti-bell"></i><span>Alertas</span>
+        <span id="alert-count" class="alert-pill hidden">0</span>
+      </button>
+      <button class="nav-item" data-page="areas" onclick="switchPage(this)">
+        <i class="ti ti-building-factory"></i><span>Estado áreas</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-badge">
+        <i class="ti ti-user-circle"></i>
+        <span id="current-user">—</span>
+      </div>
+      <button class="logout-btn" onclick="doLogout()"><i class="ti ti-logout"></i></button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <button class="menu-toggle" onclick="toggleSidebar()"><i class="ti ti-menu-2"></i></button>
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-right">
+        <div id="sync-status" class="sync-badge sync-ok"><i class="ti ti-cloud-check"></i> Sincronizado</div>
+        <div class="topbar-date" id="topbar-date"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h2>Dashboard general</h2>
+        <button class="btn-secondary sm" onclick="refreshDashboard()"><i class="ti ti-refresh"></i> Actualizar</button>
+      </div>
+      <div class="metrics-grid" id="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon blue"><i class="ti ti-clipboard-list"></i></div>
+          <div class="metric-body">
+            <div class="metric-label">Total inspecciones</div>
+            <div class="metric-value" id="m-total">—</div>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon green"><i class="ti ti-chart-bar"></i></div>
+          <div class="metric-body">
+            <div class="metric-label">Promedio cumplimiento</div>
+            <div class="metric-value" id="m-avg">—</div>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon red"><i class="ti ti-alert-circle"></i></div>
+          <div class="metric-body">
+            <div class="metric-label">Áreas críticas (&lt;50%)</div>
+            <div class="metric-value" id="m-crit" style="color:var(--red)">—</div>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon amber"><i class="ti ti-clock-exclamation"></i></div>
+          <div class="metric-body">
+            <div class="metric-label">Requieren reinspección</div>
+            <div class="metric-value" id="m-reinsp" style="color:var(--amber)">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Puntaje por área <span class="muted">(última inspección)</span></span>
+          </div>
+          <div id="area-scores-list" class="area-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Cumplimiento por categoría</span>
+          </div>
+          <div class="chart-wrap" style="height:280px">
+            <canvas id="cat-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Tendencia de cumplimiento</span>
+        </div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="trend-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: NUEVA INSPECCIÓN -->
+    <div id="page-nueva" class="page hidden">
+      <div class="page-header">
+        <h2>Nueva inspección</h2>
+        <div class="score-live-badge" id="score-live-badge">
+          <i class="ti ti-chart-pie"></i> Puntaje: <strong id="score-preview">—</strong>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title mb1">Datos generales</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Área inspeccionada *</label>
+            <select id="f-area">
+              <option value="">— Seleccionar área —</option>
+              <option>Orgánicos</option><option>Laboratorio de orgánicos</option>
+              <option>Casa hotel</option><option>Edificio de sostenibilidad</option>
+              <option>Garita</option><option>Containers</option><option>Báscula</option>
+              <option>Operaciones</option><option>Producción</option>
+              <option>Cuarto control de motores</option><option>Laboratorio de calidad</option>
+              <option>TIC's</option><option>Talento humano</option><option>Archivo</option>
+              <option>Calidad</option><option>Comunicaciones</option><option>SST</option>
+              <option>Mantenimiento</option><option>Cuarto herramientas</option>
+              <option>Taller mecánico</option><option>Taller eléctrico</option>
+              <option>Almacén</option><option>Lagunas</option>
+              <option>Contratistas Metalcat-Ofensi</option>
+              <option>Oficina administrativa Cúcuta</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Responsable del área *</label>
+            <input type="text" id="f-responsable" placeholder="Nombre completo">
+          </div>
+          <div class="form-group">
+            <label>Fecha de inspección *</label>
+            <input type="date" id="f-fecha">
+          </div>
+          <div class="form-group">
+            <label>Inspector(a)</label>
+            <input type="text" id="f-inspector" readonly>
+          </div>
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span>Preguntas respondidas</span>
+          <span id="prog-count">0 / 33</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="prog-bar"></div>
+        </div>
+      </div>
+
+      <div id="checklist-container"></div>
+
+      <div class="card">
+        <div class="card-title mb1">Observaciones y hallazgos</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Observaciones generales</label>
+            <textarea id="f-obs" placeholder="Descripción de las condiciones observadas en el área..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Hallazgos encontrados</label>
+            <textarea id="f-hallazgos" placeholder="Detallar incumplimientos y hallazgos identificados..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Oportunidades de mejora</label>
+            <textarea id="f-mejoras" placeholder="Aspectos que pueden mejorar aunque no sean incumplimientos..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Plan de acción y seguimiento</label>
+            <textarea id="f-plan" placeholder="Acciones correctivas, responsables y fechas comprometidas..."></textarea>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Evidencias fotográficas (describa)</label>
+          <textarea id="f-fotos" rows="2" placeholder="Ej: Foto 1 — punto ecológico sin identificar en zona de producción..."></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-primary" onclick="guardarInspeccion()" id="btn-guardar">
+          <i class="ti ti-device-floppy"></i> Guardar inspección
+        </button>
+        <button class="btn-secondary" onclick="limpiarFormulario()">
+          <i class="ti ti-refresh"></i> Limpiar
+        </button>
+        <div id="save-msg" class="save-msg"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: HISTORIAL -->
+    <div id="page-historial" class="page hidden">
+      <div class="page-header">
+        <h2>Historial de inspecciones</h2>
+        <button class="btn-secondary sm" onclick="exportarCSV()"><i class="ti ti-download"></i> Exportar CSV</button>
+      </div>
+      <div class="filters-bar">
+        <select id="filter-area" onchange="renderHistorial()">
+          <option value="">Todas las áreas</option>
+          <option>Orgánicos</option><option>Laboratorio de orgánicos</option>
+          <option>Casa hotel</option><option>Edificio de sostenibilidad</option>
+          <option>Garita</option><option>Containers</option><option>Báscula</option>
+          <option>Operaciones</option><option>Producción</option>
+          <option>Cuarto control de motores</option><option>Laboratorio de calidad</option>
+          <option>TIC's</option><option>Talento humano</option><option>Archivo</option>
+          <option>Calidad</option><option>Comunicaciones</option><option>SST</option>
+          <option>Mantenimiento</option><option>Cuarto herramientas</option>
+          <option>Taller mecánico</option><option>Taller eléctrico</option>
+          <option>Almacén</option><option>Lagunas</option>
+          <option>Contratistas Metalcat-Ofensi</option>
+          <option>Oficina administrativa Cúcuta</option>
+        </select>
+        <select id="filter-score" onchange="renderHistorial()">
+          <option value="">Todos los puntajes</option>
+          <option value="critico">Crítico (&lt;50%)</option>
+          <option value="bajo">Bajo (50–69%)</option>
+          <option value="aceptable">Aceptable (70–89%)</option>
+          <option value="bueno">Bueno (≥90%)</option>
+        </select>
+        <select id="filter-inspector" onchange="renderHistorial()">
+          <option value="">Todos los inspectores</option>
+          <option>Claudia Pabón</option>
+          <option>Neyla Durán</option>
+        </select>
+      </div>
+      <div id="historial-list"></div>
+    </div>
+
+    <!-- PAGE: ALERTAS -->
+    <div id="page-alertas" class="page hidden">
+      <div class="page-header"><h2>Alertas y reinspecciones</h2></div>
+      <div class="alerts-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Áreas críticas o bajas <span class="muted">(puntaje &lt;70%)</span></span>
+          </div>
+          <div id="alertas-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Sin inspección reciente <span class="muted">(+30 días)</span></span>
+          </div>
+          <div id="no-inspect-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: ESTADO ÁREAS -->
+    <div id="page-areas" class="page hidden">
+      <div class="page-header"><h2>Estado de todas las áreas</h2></div>
+      <div id="areas-grid" class="areas-cards-grid"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL DETALLE -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <div id="modal-title" class="modal-title"></div>
+        <div id="modal-meta" class="modal-meta"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

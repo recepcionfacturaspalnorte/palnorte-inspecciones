@@ -1,0 +1,15 @@
+// firestore.rules
+// Pega estas reglas en Firebase Console > Firestore > Reglas
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Inspecciones: cualquier usuario autenticado puede leer y escribir
+    // (la autenticación es manejada por la app con contraseñas locales)
+    // Para mayor seguridad en producción, implementar Firebase Authentication
+    match /inspecciones/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
