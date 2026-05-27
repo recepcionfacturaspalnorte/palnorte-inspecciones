@@ -65,7 +65,7 @@ const CORREOS_AREAS = {
   "TIC's":                        "soporte@palnortesas.com",
   "Talento humano":               "directoradministrativo@palnortesas.com",
   "Archivo":                      "compras@palnortesas.com",
-  "Calidad":                      "",
+  "Calidad":                      "calidad@palnortesas.com",
   "Comunicaciones":               "comunicaciones@palnortesas.com",
   "SST":                          "lidersst@palnortesas.com",
   "Mantenimiento":                "lidermantenimiento@palnortesas.com",
