@@ -490,6 +490,7 @@ textarea { resize: vertical; min-height: 80px; }
 .modal-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin-bottom: .5rem; }
 .modal-section-body { font-size: 13px; line-height: 1.7; color: var(--text); }
 .cat-score-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12px; }
+.cat-row-clickable:hover { background: var(--bg); border-radius: 6px; padding-left: 4px; transition: background .15s; }
 .cat-score-name { flex: 1; }
 .cat-score-bar { width: 80px; height: 4px; background: var(--bg); border-radius: 999px; overflow: hidden; }
 .cat-score-fill { height: 100%; border-radius: 999px; }
