@@ -441,10 +441,36 @@ function verDetalle(id) {
 
   const catRows = CATEGORIAS.map((cat, ci) => {
     const s = catS[ci];
-    return `<div class="cat-score-row">
-      <span class="cat-score-name">${cat.name}</span>
+    const ans = i.answers || {};
+    const conteo = cat.preguntas.reduce((acc, _, qi) => {
+      const v = ans[`${ci}-${qi}`];
+      if (v === 'N') acc.malos++;
+      else if (v === 'P') acc.parciales++;
+      return acc;
+    }, { malos: 0, parciales: 0 });
+    const hayProblemas = conteo.malos > 0 || conteo.parciales > 0;
+    const alertaBadge = hayProblemas
+      ? `<span style="font-size:10px;background:${conteo.malos>0?'#A32D2D':'#E07B17'};color:#fff;padding:1px 7px;border-radius:10px;margin-left:6px">${conteo.malos>0?conteo.malos+' NC':''}${conteo.malos>0&&conteo.parciales>0?' · ':''}${conteo.parciales>0?conteo.parciales+' P':''}</span>`
+      : '';
+    return `<div class="cat-score-row cat-row-clickable" onclick="toggleCatDetail('cat-detail-${id}-${ci}')" style="cursor:pointer;user-select:none">
+      <span class="cat-score-name">${cat.name}${alertaBadge}</span>
       <div class="cat-score-bar"><div class="cat-score-fill" style="width:${s||0}%;background:${scoreColor(s)}"></div></div>
       <span class="cat-score-val">${s !== null && s !== undefined ? s.toFixed(0)+'%' : 'N/A'}</span>
+      <span style="font-size:11px;color:#888;margin-left:4px;flex-shrink:0">▾</span>
+    </div>
+    <div id="cat-detail-${id}-${ci}" style="display:none;padding:4px 0 8px 4px">
+      ${cat.preguntas.map((preg, qi) => {
+        const v = ans[`${ci}-${qi}`];
+        const color = v === 'C' ? '#1D9E75' : v === 'P' ? '#E07B17' : v === 'N' ? '#A32D2D' : '#9e9e97';
+        const icon = v === 'C' ? '✓' : v === 'P' ? '⚡' : v === 'N' ? '✗' : '—';
+        const label = v === 'C' ? 'Cumple' : v === 'P' ? 'Parcial' : v === 'N' ? 'No cumple' : v === 'NA' ? 'N/A' : 'Sin resp.';
+        const bg = v === 'N' ? '#fce4e4' : v === 'P' ? '#fff8e1' : 'transparent';
+        return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 8px;margin-bottom:3px;border-radius:6px;background:${bg};font-size:12px">
+          <span style="color:${color};font-weight:700;flex-shrink:0;margin-top:1px">${icon}</span>
+          <span style="flex:1;color:#333;line-height:1.4">${preg}</span>
+          <span style="color:${color};font-weight:600;font-size:11px;flex-shrink:0;margin-top:2px">${label}</span>
+        </div>`;
+      }).join('')}
     </div>`;
   }).join('');
 
@@ -482,15 +508,212 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
 }
 
+function toggleCatDetail(detailId) {
+  const el = document.getElementById(detailId);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  // Rotar el chevron en la fila padre
+  const row = el.previousElementSibling;
+  if (row) {
+    const chevron = row.querySelector('span:last-child');
+    if (chevron) chevron.textContent = isOpen ? '▾' : '▴';
+  }
+}
+
 function generarInforme(id) {
   const i = inspecciones.find(x => x.id === id);
   if (!i) return;
   const catS = i.catScores || calcCatScores(i.answers || {});
-  const catLines = CATEGORIAS.map((cat, ci) => `• ${cat.name}: ${catS[ci] !== null ? catS[ci].toFixed(0)+'%' : 'N/A'}`).join('\n');
-  closeModal();
-  // Abrir Claude para generar el informe
-  const prompt = `Por favor genera un informe formal de inspección ambiental en español con la siguiente información:\n\n**Encabezado:** PALNORTE S.A.S — Lista de chequeo inspecciones mensuales | Código: GAM-01-FO-15 | Versión: 01\n\n**Área inspeccionada:** ${i.area}\n**Fecha:** ${formatDate(i.fecha)}\n**Inspector(a):** ${i.inspector}\n**Responsable del área:** ${i.responsable}\n**Puntaje global:** ${i.score.toFixed(1)}% — ${scoreLabel(i.score)}\n\n**Puntaje por categoría:**\n${catLines}\n\n**Observaciones generales:** ${i.obs || 'N/A'}\n**Hallazgos encontrados:** ${i.hallazgos || 'N/A'}\n**Oportunidades de mejora:** ${i.mejoras || 'N/A'}\n**Plan de acción y seguimiento:** ${i.plan || 'N/A'}\n**Evidencias:** ${i.fotos || 'N/A'}\n\nEl informe debe ser formal, estructurado con secciones claras, listo para enviar por correo al líder del área. Incluye recomendaciones según el puntaje obtenido.`;
-  window.parent.postMessage({ type: 'sendPrompt', text: prompt }, '*');
+  const ans = i.answers || {};
+
+  // Determinar recomendaciones según puntaje
+  let recomendaciones = '';
+  if (i.score < 50) {
+    recomendaciones = `<p>El área presenta un nivel <strong>CRÍTICO</strong> de cumplimiento ambiental. Se requiere intervención inmediata y plan de mejora urgente. Se recomienda realizar reinspección en un plazo no mayor a 15 días calendario.</p>`;
+  } else if (i.score < 70) {
+    recomendaciones = `<p>El área presenta un nivel de cumplimiento <strong>BAJO</strong>. Se requiere plan de acción correctivo y seguimiento periódico. Se recomienda reinspección en un plazo de 30 días.</p>`;
+  } else if (i.score < 90) {
+    recomendaciones = `<p>El área presenta un nivel de cumplimiento <strong>ACEPTABLE</strong>. Se recomienda reforzar los ítems con calificación parcial y mantener las buenas prácticas actuales.</p>`;
+  } else {
+    recomendaciones = `<p>El área presenta un nivel de cumplimiento <strong>BUENO</strong>. Se recomienda mantener las prácticas actuales y servir como referente para otras áreas.</p>`;
+  }
+
+  // Tabla de ítems por categoría
+  const tablaCategorias = CATEGORIAS.map((cat, ci) => {
+    const s = catS[ci];
+    const color = scoreColor(s);
+    const filas = cat.preguntas.map((preg, qi) => {
+      const val = ans[`${ci}-${qi}`];
+      const texto = val === 'C' ? 'Cumple' : val === 'P' ? 'Parcial' : val === 'N' ? 'No cumple' : val === 'NA' ? 'N/A' : '—';
+      const colorFila = val === 'C' ? '#e8f5e9' : val === 'P' ? '#fff8e1' : val === 'N' ? '#fce4e4' : '#f5f5f5';
+      return `<tr style="background:${colorFila}">
+        <td style="padding:6px 10px;font-size:11px;border-bottom:1px solid #e0e0e0">${preg}</td>
+        <td style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid #e0e0e0;white-space:nowrap;text-align:center">${texto}</td>
+      </tr>`;
+    }).join('');
+    return `
+      <div style="margin-bottom:18px;page-break-inside:avoid">
+        <table style="width:100%;border-collapse:collapse;border:1px solid #ccc;border-radius:4px;overflow:hidden">
+          <thead>
+            <tr style="background:${color}22">
+              <th colspan="2" style="padding:8px 10px;text-align:left;font-size:12px;font-weight:700;border-bottom:2px solid ${color};color:#333">
+                ${cat.name} &nbsp;
+                <span style="font-weight:400;color:${color}">${s !== null && s !== undefined ? s.toFixed(0)+'%' : 'N/A'} — ${scoreLabel(s)}</span>
+              </th>
+            </tr>
+            <tr style="background:#f5f5f5">
+              <th style="padding:6px 10px;font-size:11px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid #ddd">Criterio evaluado</th>
+              <th style="padding:6px 10px;font-size:11px;text-align:center;font-weight:600;color:#555;border-bottom:1px solid #ddd;width:90px">Resultado</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  const colorScore = scoreColor(i.score);
+  const fecha = new Date().toLocaleDateString('es-CO', {day:'2-digit',month:'long',year:'numeric'});
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe Inspección - ${i.area}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; background:#fff; padding:20px; }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none !important; }
+    @page { margin: 1.5cm; size: A4; }
+  }
+  .btn-print { background:#1D9E75; color:#fff; border:none; padding:10px 22px; font-size:13px; border-radius:6px; cursor:pointer; margin-right:10px; }
+  .btn-close { background:#eee; color:#333; border:none; padding:10px 22px; font-size:13px; border-radius:6px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="no-print" style="padding:12px 0 20px;display:flex;gap:10px;align-items:center">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
+  <span style="font-size:11px;color:#888">Para guardar como PDF: en el diálogo de impresión selecciona "Guardar como PDF"</span>
+</div>
+
+<!-- ENCABEZADO -->
+<table style="width:100%;border-collapse:collapse;border:2px solid #1D9E75;margin-bottom:18px">
+  <tr>
+    <td style="width:18%;padding:10px;border-right:2px solid #1D9E75;vertical-align:middle;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:#1D9E75;line-height:1.4">PALNORTE<br>S.A.S.</div>
+    </td>
+    <td style="padding:10px 14px;vertical-align:middle">
+      <div style="font-size:14px;font-weight:700;color:#1D9E75">INSPECCIÓN AMBIENTAL MENSUAL — LISTA DE CHEQUEO</div>
+      <div style="font-size:11px;color:#555;margin-top:4px">PALMICULTORES DEL NORTE S.A.S. (PALNORTE)</div>
+    </td>
+    <td style="width:22%;padding:10px;border-left:2px solid #1D9E75;vertical-align:middle;text-align:center;font-size:10px;color:#555;line-height:1.8">
+      <div><strong>Código:</strong> GAM-01-FO-15</div>
+      <div><strong>Versión:</strong> 01</div>
+      <div><strong>Emitido:</strong> ${fecha}</div>
+    </td>
+  </tr>
+</table>
+
+<!-- DATOS GENERALES -->
+<table style="width:100%;border-collapse:collapse;border:1px solid #ccc;margin-bottom:18px">
+  <thead>
+    <tr style="background:#1D9E75">
+      <th colspan="4" style="padding:7px 12px;text-align:left;color:#fff;font-size:12px;letter-spacing:.5px">DATOS GENERALES DE LA INSPECCIÓN</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="background:#f9f9f9">
+      <td style="padding:7px 12px;font-weight:700;width:25%;border:1px solid #ddd">Área inspeccionada:</td>
+      <td style="padding:7px 12px;border:1px solid #ddd">${i.area}</td>
+      <td style="padding:7px 12px;font-weight:700;width:20%;border:1px solid #ddd">Fecha:</td>
+      <td style="padding:7px 12px;border:1px solid #ddd">${formatDate(i.fecha)}</td>
+    </tr>
+    <tr>
+      <td style="padding:7px 12px;font-weight:700;border:1px solid #ddd">Inspector(a):</td>
+      <td style="padding:7px 12px;border:1px solid #ddd">${i.inspector}</td>
+      <td style="padding:7px 12px;font-weight:700;border:1px solid #ddd">Responsable:</td>
+      <td style="padding:7px 12px;border:1px solid #ddd">${i.responsable}</td>
+    </tr>
+    <tr style="background:#f9f9f9">
+      <td style="padding:7px 12px;font-weight:700;border:1px solid #ddd">Puntaje global:</td>
+      <td style="padding:7px 12px;border:1px solid #ddd">
+        <strong style="font-size:15px;color:${colorScore}">${i.score.toFixed(1)}%</strong>
+        &nbsp;—&nbsp; <strong style="color:${colorScore}">${scoreLabel(i.score)}</strong>
+      </td>
+      <td style="padding:7px 12px;font-weight:700;border:1px solid #ddd">Resultado:</td>
+      <td style="padding:7px 12px;border:1px solid #ddd">
+        ${i.score < 50 ? '⚠️ Requiere intervención inmediata' : i.score < 70 ? '⚠️ Requiere reinspección' : i.score < 90 ? '✔ Aceptable con mejoras' : '✅ Cumplimiento satisfactorio'}
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- RECOMENDACIONES -->
+<table style="width:100%;border-collapse:collapse;border:1px solid #ccc;margin-bottom:18px">
+  <thead>
+    <tr style="background:${colorScore}22;border-left:4px solid ${colorScore}">
+      <th style="padding:7px 12px;text-align:left;font-size:12px;color:#333">CONCEPTO Y RECOMENDACIONES</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding:10px 12px;border:1px solid #ddd;font-size:12px">${recomendaciones}</td></tr>
+  </tbody>
+</table>
+
+<!-- EVALUACIÓN DETALLADA POR CATEGORÍA -->
+<div style="background:#1D9E75;color:#fff;padding:7px 12px;font-size:12px;font-weight:700;letter-spacing:.5px;margin-bottom:12px">
+  EVALUACIÓN DETALLADA POR CATEGORÍA
+</div>
+${tablaCategorias}
+
+<!-- OBSERVACIONES Y HALLAZGOS -->
+${i.obs || i.hallazgos || i.mejoras || i.plan ? `
+<table style="width:100%;border-collapse:collapse;border:1px solid #ccc;margin-bottom:18px">
+  <thead>
+    <tr style="background:#1D9E75">
+      <th colspan="2" style="padding:7px 12px;text-align:left;color:#fff;font-size:12px">OBSERVACIONES Y HALLAZGOS</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${i.obs ? `<tr><td style="padding:7px 12px;font-weight:700;width:28%;border:1px solid #ddd;vertical-align:top">Observaciones generales:</td><td style="padding:7px 12px;border:1px solid #ddd">${i.obs}</td></tr>` : ''}
+    ${i.hallazgos ? `<tr style="background:#fce4e4"><td style="padding:7px 12px;font-weight:700;border:1px solid #ddd;vertical-align:top">Hallazgos encontrados:</td><td style="padding:7px 12px;border:1px solid #ddd">${i.hallazgos}</td></tr>` : ''}
+    ${i.mejoras ? `<tr><td style="padding:7px 12px;font-weight:700;border:1px solid #ddd;vertical-align:top">Oportunidades de mejora:</td><td style="padding:7px 12px;border:1px solid #ddd">${i.mejoras}</td></tr>` : ''}
+    ${i.plan ? `<tr style="background:#f9f9f9"><td style="padding:7px 12px;font-weight:700;border:1px solid #ddd;vertical-align:top">Plan de acción:</td><td style="padding:7px 12px;border:1px solid #ddd">${i.plan}</td></tr>` : ''}
+    ${i.fotos ? `<tr><td style="padding:7px 12px;font-weight:700;border:1px solid #ddd;vertical-align:top">Evidencias fotográficas:</td><td style="padding:7px 12px;border:1px solid #ddd">${i.fotos}</td></tr>` : ''}
+  </tbody>
+</table>` : ''}
+
+<!-- FIRMAS -->
+<table style="width:100%;border-collapse:collapse;border:1px solid #ccc;margin-top:30px">
+  <thead>
+    <tr style="background:#1D9E75">
+      <th colspan="2" style="padding:7px 12px;text-align:left;color:#fff;font-size:12px">FIRMAS Y VALIDACIÓN</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="padding:40px 20px 12px;border:1px solid #ddd;text-align:center;width:50%">
+        <div style="border-top:1px solid #333;padding-top:8px;font-size:11px"><strong>${i.inspector}</strong><br>Inspector(a) Ambiental</div>
+      </td>
+      <td style="padding:40px 20px 12px;border:1px solid #ddd;text-align:center;width:50%">
+        <div style="border-top:1px solid #333;padding-top:8px;font-size:11px"><strong>${i.responsable}</strong><br>Responsable del Área</div>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<div style="margin-top:16px;font-size:9px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:10px">
+  PALMICULTORES DEL NORTE S.A.S. — Sistema de Gestión Ambiental — GAM-01-FO-15 v01 — Generado el ${fecha}
+</div>
+</body>
+</html>`;
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(html);
+  ventana.document.close();
 }
 
 function exportarPDF(id) {
